@@ -30,8 +30,7 @@ from google.generativeai import GenerativeModel
 from google.generativeai import configure
 import tkinter as tk
 from tkinter import filedialog
-import os
-import pandas as pd
+
 
 
 class GeminiModel:

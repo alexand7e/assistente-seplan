@@ -1,4 +1,6 @@
 python-docx
 google_generativeai
 streamlit
-streamlit-cookies
+pathlib
+tkinter
+pandas
