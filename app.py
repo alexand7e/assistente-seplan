@@ -28,10 +28,6 @@ import pandas as pd
 from pathlib import Path
 from google.generativeai import GenerativeModel
 from google.generativeai import configure
-import tkinter as tk
-from tkinter import filedialog
-
-
 
 class GeminiModel:
     def __init__(self, api_key):
@@ -59,12 +55,12 @@ class GeminiModel:
                 ]
             }
             if file1 is not None and file2 is not None:
-                message["parts"].append(f"\nDados da Planilha 1:\n{file1.head().to_string()}")
-                message["parts"].append(f"\nDados da Planilha 2:\n{file2.head().to_string()}")
+                message["parts"].append(f"\nDados da Planilha 1:\n{file1.to_string()}")
+                message["parts"].append(f"\nDados da Planilha 2:\n{file2.to_string()}")
         else:
             message = {
                 "role": "user",
-                "parts": [f"Compare os relatórios entre os arquivos:\n{file1.head().to_string()}\n\ne\n\n{file2.head().to_string()}"]
+                "parts": [f"Compare os relatórios entre os arquivos:\n{file1.to_string()}\n\ne\n\n{file2.to_string()}"]
             }
         
         try:
@@ -113,23 +109,13 @@ class StreamlitApp:
                 self.gemini_model = GeminiModel(st.session_state["api_key"])
                 st.success("API configurada com sucesso!")
 
-            st.header("Seleção de Pasta")
-            with st.sidebar:
-                root = tk.Tk()
-                root.withdraw()
-                root.wm_attributes('-topmost', 1)
-                st.write('Please select a folder:')
-                clicked = st.button('Selecionar Pasta')
-                
-            if clicked:
-                folder_path = str(filedialog.askdirectory(master=root))
-                pdf_reports = [file for file in os.listdir(folder_path) if file.endswith('.pdf')]
-                
-                if folder_path:
-                    st.session_state["folder_path"] = folder_path
-                    st.success(f"Pasta selecionada: {folder_path}")
-                else:
-                    st.error("Nenhuma pasta foi selecionada.")
+            folder_path = str(st.text_input("Insira o caminho da pasta com as planilhas:"))
+            
+            if folder_path:
+                st.session_state["folder_path"] = folder_path
+                st.success(f"Pasta selecionada: {folder_path}")
+            else:
+                st.error("Nenhuma pasta foi selecionada.")
 
             if "folder_path" in st.session_state and st.session_state["folder_path"]:
                 folder_path = st.session_state["folder_path"]
@@ -152,7 +138,7 @@ class StreamlitApp:
 
                 if st.button("Analisar Planilhas"):
                     with st.spinner("Analisando planilhas..."):
-                        result = self.gemini_model.analyze_files(files[0], files[1])
+                        result = self.gemini_model.analyze_files(st.session_state["excel_files"]["file1"], st.session_state["excel_files"]["file2"])
                     st.subheader("Resultado da Análise")
                     st.write(result)
 
