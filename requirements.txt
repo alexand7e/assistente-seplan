@@ -3,4 +3,4 @@ google_generativeai
 streamlit
 pathlib
 pandas
-tk
+openpyxl
