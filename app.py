@@ -1,8 +1,10 @@
 import os
-import sys
+import streamlit as st
+import pandas as pd
+from google.generativeai import GenerativeModel
+from google.generativeai import configure
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__))))
-
+# Definir o prompt para o modelo de IA
 prompt = r"""
 ## Persona
 Sou assistente financeiro que acompanha e monitora a execução orçamentária e financeira do Programa Pacto pelas Crianças
@@ -22,13 +24,6 @@ Sou assistente financeiro que acompanha e monitora a execução orçamentária e
 *Diretrizes:* Sempre informe a data e o horário dos relatórios {R1} e {R2}.
 """
 
-import os
-import streamlit as st
-import pandas as pd
-from pathlib import Path
-from google.generativeai import GenerativeModel
-from google.generativeai import configure
-
 class GeminiModel:
     def __init__(self, api_key):
         configure(api_key=api_key)
@@ -47,7 +42,7 @@ class GeminiModel:
 
     def analyze_files(self, file1=None, file2=None, user_input=None):
         if user_input:
-            # Include file context in the message
+            # Incluir o contexto dos arquivos na mensagem
             message = {
                 "role": "user",
                 "parts": [
@@ -55,32 +50,19 @@ class GeminiModel:
                 ]
             }
             if file1 is not None and file2 is not None:
-                message["parts"].append(f"\nDados da Planilha 1:\n{file1.to_string()}")
-                message["parts"].append(f"\nDados da Planilha 2:\n{file2.to_string()}")
+                message["parts"].append(f"\nDados da Planilha 1:\n{file1.head().to_string()}")
+                message["parts"].append(f"\nDados da Planilha 2:\n{file2.head().to_string()}")
         else:
             message = {
                 "role": "user",
-                "parts": [f"Compare os relatórios entre os arquivos:\n{file1.to_string()}\n\ne\n\n{file2.to_string()}"]
+                "parts": [f"Compare os relatórios entre os arquivos:\n{file1.head().to_string()}\n\ne\n\n{file2.head().to_string()}"]
             }
-        
+
         try:
             response = self.model.generate_content(message)
             return response.text
         except Exception as e:
             return f"Erro ao processar a análise: {e}"
-
-
-class FileHandler:
-    @staticmethod
-    def get_latest_files(folder_path, n=2):
-        folder = Path(folder_path)
-        files = sorted(folder.glob("*.xlsx"), key=lambda f: f.stat().st_mtime, reverse=True)
-        return files[:n]
-
-    @staticmethod
-    def read_excel(file_path):
-        return pd.read_excel(file_path)
-
 
 class StreamlitApp:
     def __init__(self):
@@ -109,38 +91,30 @@ class StreamlitApp:
                 self.gemini_model = GeminiModel(st.session_state["api_key"])
                 st.success("API configurada com sucesso!")
 
-            folder_path = str(st.text_input("Insira o caminho da pasta com as planilhas:"))
-            
-            if folder_path:
-                st.session_state["folder_path"] = folder_path
-                st.success(f"Pasta selecionada: {folder_path}")
-            else:
-                st.error("Nenhuma pasta foi selecionada.")
+            st.header("Upload de Planilhas")
+            uploaded_files = st.file_uploader("Faça upload das duas planilhas para análise:", type=["xlsx"], accept_multiple_files=True)
 
-            if "folder_path" in st.session_state and st.session_state["folder_path"]:
-                folder_path = st.session_state["folder_path"]
-                files = FileHandler.get_latest_files(folder_path)
+            if uploaded_files and len(uploaded_files) == 2:
+                file1 = pd.read_excel(uploaded_files[0])
+                file2 = pd.read_excel(uploaded_files[1])
 
-                if len(files) < 2:
-                    st.error("Não há planilhas suficientes na pasta para análise (mínimo 2).")
-                    return
-
-                # Store files in session state
-                st.session_state["excel_files"]["file1"] = FileHandler.read_excel(files[0])
-                st.session_state["excel_files"]["file2"] = FileHandler.read_excel(files[1])
+                st.session_state["excel_files"]["file1"] = file1
+                st.session_state["excel_files"]["file2"] = file2
 
                 st.write("Planilhas carregadas:")
-                # st.write("Planilha 1:", files[0].name)
-                # st.dataframe(file1.head())
+                st.write(f"**Planilha 1:** {uploaded_files[0].name}")
+                st.dataframe(file1.head())
 
-                # st.write("Planilha 2:", files[1].name)
-                # st.dataframe(file2.head())
+                st.write(f"**Planilha 2:** {uploaded_files[1].name}")
+                st.dataframe(file2.head())
 
                 if st.button("Analisar Planilhas"):
                     with st.spinner("Analisando planilhas..."):
-                        result = self.gemini_model.analyze_files(st.session_state["excel_files"]["file1"], st.session_state["excel_files"]["file2"])
+                        result = self.gemini_model.analyze_files(file1=file1, file2=file2)
                     st.subheader("Resultado da Análise")
                     st.write(result)
+            elif uploaded_files and len(uploaded_files) < 2:
+                st.warning("Por favor, faça upload de duas planilhas para análise.")
 
             st.header("Chat com a IA")
             user_input = st.text_input("Digite sua mensagem para a IA:")
@@ -159,7 +133,6 @@ class StreamlitApp:
 
         else:
             st.warning("Por favor, insira sua chave API para continuar.")
-
 
 if __name__ == "__main__":
     app = StreamlitApp()
